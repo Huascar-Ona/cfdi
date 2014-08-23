@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+        
+        <record id="view_company_form_cfd" model="ir.ui.view">
+            <field name="name">company.form.cfd</field>
+            <field name="model">res.company</field>
+            <field name="inherit_id" ref="base.view_company_form"/>
+            <field name="arch" type="xml">
+                <notebook position="inside">
+                    <page string="CFD">
+                        <group>
+                        <group string="General">
+                            <field name="cfdi_version" size="10"/>
+                            <field name="cfdi_test" attrs="{'invisible':[('cfdi_version','!=','3.2')]}"/>
+                        </group>
+                        <group string="PAC" attrs="{'invisible':[('cfdi_version','!=','3.2')]}">
+                            <field name="cfdi_pac"/>
+                            <field name="cfdi_tralix_key" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
+                            <field name="cfdi_tralix_host" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
+                            <field name="cfdi_tralix_host_test" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
+                            <field name="cfdi_finkok_user" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_key" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_host" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_host_cancel" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_host_test" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_host_cancel_test" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                        </group>
+                        </group>
+                        <separator string="Diarios"/>
+                        <div>
+                            <p>Especificar diarios para los cuales crear CFDs. Si no se especifica ninguno,
+                            se crearán CFDs para facturas de cualquier diario</p>
+                            <field name="cfdi_journal_ids"/>                            
+                        </div>
+                    </page>
+                </notebook>
+            </field>
+        </record>
+       
+    </data>
+</openerp>

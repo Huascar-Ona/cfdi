@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+    
+        <record id="action_conf_addenda" model="ir.actions.act_window">
+            <field name="name">Addendas</field>
+            <field name="res_model">cfdi.conf_addenda</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="view_type">tree</field>
+            <field name="view_mode">list,form</field>
+            <field name="target"></field>
+        </record>
+    
+        <menuitem action="action_conf_addenda" id="menu_conf_addenda" sequence="" 
+            parent="account.menu_finance_configuration" groups="group_cfdi_user" />
+
+        
+        <record id="conf_addenda_view_form" model="ir.ui.view">
+            <field name="name">conf.addenda.form.view</field>
+            <field name="model">cfdi.conf_addenda</field>
+            <field name="arch" type="xml">
+                <form string="Configuración Addenda" version="7.0">
+                    <group>
+                        <group>
+                            <field name="model"/>
+                            <field name="partner_ids"/>
+                        </group>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record id="conf_addenda_view_tree" model="ir.ui.view">
+            <field name="name">conf.addenda.tree.view</field>
+            <field name="model">cfdi.conf_addenda</field>
+            <field name="arch" type="xml">
+                <tree string="Configuración">
+                    <field name="model"/>    
+                    <field name="partner_ids"/>    
+                </tree>
+            </field>
+        </record>
+
+
+
+
+        <record model="ir.ui.view" id="view_invoice_form_cfd">
+            <field name="name">account_invoice_form_cfd</field>
+            <field name="model">account.invoice</field>
+            <field name="inherit_id" ref="account.invoice_form"/>
+            <field name="arch" type="xml">
+                <data>
+                    <button name="invoice_cancel" position="after">
+                        <button name="action_cancel_cfdi" type="object" string="Cancelar CFDI" attrs="{'invisible':['|', ('state','!=','open'), ('uuid','=',False)]}"/>
+                    </button>
+                    <notebook position="inside">
+                        <page string="Info. SAT">
+                            <group>
+                                <field name="uuid" readonly="1"/>
+                                <field name="test" readonly="1"/>
+                                <field name="sello_sat" readonly="1"/>
+                                <field name="certificado_sat" readonly="1"/>
+                                <field name="fecha_timbrado" readonly="1"/>
+                                <field name="cadena_sat" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Cancelación" attrs="{'invisible': [('mandada_cancelar','=',False)]}">
+                            <field name="mandada_cancelar" invisible="1"/>
+                            <label for="mensaje_pac"/>
+                            <field name="mensaje_pac" readonly="1"/>
+                        </page>
+                    </notebook>
+                    <h1 position="before">
+                        <field name="qrcode" widget="image" class="oe_left oe_avatar" attrs="{'invisible':[('uuid','=',False)]}"/>
+                    </h1>
+                    <field name="fiscal_position" position="after">
+                        <field name="formapago_id" on_change="onchange_metododepago(partner_id,formapago_id)"/>
+                        <field name="cuentaBanco" attrs="{'invisible':[('cuentaBanco','=','')]}"/>
+                    </field>
+                </data>
+            </field>
+        </record>
+        
+        <record model="ir.ui.view" id="view_invoice_tree_cfd">
+            <field name="name">account_invoice_tree_cfd</field>
+            <field name="model">account.invoice</field>
+            <field name="inherit_id" ref="account.invoice_tree"/>
+            <field name="arch" type="xml">
+                <tree position="attributes">
+                    <attribute name="colors">orange:mandada_cancelar == True and state != 'cancel';blue:state == 'draft';black:state in ('proforma','proforma2','open');gray:state == 'cancel'</attribute>
+                </tree>
+                <field name="number" position="replace">
+                    <field name="mandada_cancelar" invisible="1"/>
+                    <field name="serie"/>
+                    <field name="internal_number" />
+                </field>
+            </field>
+        </record>
+            
+    </data>
+</openerp>
+
+
+

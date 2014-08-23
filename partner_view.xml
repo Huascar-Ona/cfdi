@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record model="ir.ui.view" id="view_partner_form_cfd">
+            <field name="name">view.partner.form.cfd</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <data>
+                    <field name="category_id" position="after">
+                        <field name="regimen_id" placeholder="Régimen fiscal" groups="cfdi.group_cfdi_manager"/>
+                    </field>
+                    <field name="property_account_position" position="after">
+                        <field name="metodo_pago"/>
+                    </field>
+                </data>
+            </field>
+        </record>
+            
+    </data>
+</openerp>
+
+

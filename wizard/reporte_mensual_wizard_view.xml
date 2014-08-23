@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+    
+        <record model="ir.ui.view" id="cfdi_reporte_menusal_wizard_form">
+            <field name="name">cfdi.reporte.menusal.wizard.form</field>
+            <field name="model">cfdi.reporte.mensual.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Reporte mensual" version="7.0">
+                    <field name="state" invisible="1" />
+                    <separator string="Periodo" states="choose"/>
+                    <group states="choose">                        
+                        <field name="mes" />
+                        <field name="ano" />
+                    </group>
+                    <group states="get">
+                        <field name="data" readonly="1" filename="fname" />
+                    </group>
+                    <footer>
+                        <button type="special" special="cancel" string="Cerrar" icon="gtk-cancel"/>
+                        <button states="choose" type="object" name="action_reporte" string="Reporte mensual" icon="gtk-ok"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    
+        <record id="action_reporte_mensual_wizard" model="ir.actions.act_window">
+            <field name="name">Reporte mensual SAT</field>
+            <field name="res_model">cfdi.reporte.mensual.wizard</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="view_type">form</field>
+            <field name="view_id" ref="cfdi_reporte_menusal_wizard_form"/>
+            <field name="target">new</field>
+        </record>
+      
+        <menuitem action="action_reporte_mensual_wizard" 
+                id="menu_res_cfd_reporte_mensual" sequence="10" 
+                parent="account.menu_finance_receivables" groups="cfdi.group_cfdi_user" />
+ 
+        
+        
+    </data>
+</openerp>    
