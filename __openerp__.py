@@ -27,7 +27,8 @@
     """,
     'init_xml': [
         'security/cfdi_groups.xml',
-        'security/ir.model.access.csv'
+        'security/ir.model.access.csv',
+        'data/estados.xml'
     ],
     'data': [
         'res_company_view.xml',

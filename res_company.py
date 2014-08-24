@@ -41,5 +41,5 @@ class company(osv.Model):
     _defaults = {
         'cfdi_version': '3.2',
         'cfdi_test': True,
-        'cfdi_pac': 'zenpar',
+        'cfdi_pac': 'finkok',
     }

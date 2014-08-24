@@ -1,13 +1,5 @@
 # -*- encoding: utf-8 -*-
 ############################################################################
-#    Module for OpenERP, Open Source Management Solution
-#
-#    Copyright (c) 2013 Zenpar - http://www.zeval.com.mx/
-#    All Rights Reserved.
-############################################################################
-#    Coded by: jsolorzano@zeval.com.mx
-#    Manager: Orlando Zentella ozentella@zeval.com.mx
-############################################################################
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as
@@ -24,10 +16,9 @@
 #
 ##############################################################################
 
-
 from openerp.osv import osv, fields
-from files import TempFileTransaction
-import openssl
+from helpers.files import TempFileTransaction
+import helpers.openssl
 
 class certificate(osv.Model):
     _name = 'cfdi.certificate'
@@ -47,7 +38,8 @@ class certificate(osv.Model):
     }
     
     def onchange_cer(self, cr, uid, id, cer, context=None):
-        print "AQUI ESTOY"
+        if not cer:
+            return {}
         tmpfiles = TempFileTransaction()
         try:
            fname_cer = tmpfiles.decode_and_save(cer)
@@ -55,15 +47,7 @@ class certificate(osv.Model):
            start_date, end_date = openssl.get_dates(fname_cer)
         finally:
             tmpfiles.clean()
-        return {
-            'value': {
-                'serial': serial,
-                'start_date': start_date,
-                'end_date': end_date
-                }
-        }
-    
-    
+        return {'value': {'serial': serial, 'start_date': start_date, 'end_date': end_date}}
     
     def button_generate_pem(self, cr, uid, id, context=None):
         certificate = self.browse(cr, uid, id)[0]

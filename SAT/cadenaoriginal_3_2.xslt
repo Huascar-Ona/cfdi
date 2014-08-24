@@ -6,7 +6,26 @@
 	<!--
 		En esta sección se define la inclusión de las plantillas de utilerías para colapsar espacios
 	-->
-	<xsl:include href="http://www.sat.gob.mx/sitio_internet/cfd/2/cadenaoriginal_2_0/utilerias.xslt"/>
+	<!--<xsl:include href="http://www.sat.gob.mx/sitio_internet/cfd/2/cadenaoriginal_2_0/utilerias.xslt"/>-->
+  <!-- Manejador de datos requeridos -->
+  <xsl:template name="Requerido">
+    <xsl:param name="valor"/>|<xsl:call-template name="ManejaEspacios">
+      <xsl:with-param name="s" select="$valor"/>
+    </xsl:call-template>
+  </xsl:template>
+
+  <!-- Manejador de datos opcionales -->
+  <xsl:template name="Opcional">
+    <xsl:param name="valor"/>
+    <xsl:if test="$valor">|<xsl:call-template name="ManejaEspacios"><xsl:with-param name="s" select="$valor"/></xsl:call-template></xsl:if>
+  </xsl:template>
+  
+  <!-- Normalizador de espacios en blanco -->
+  <xsl:template name="ManejaEspacios">
+    <xsl:param name="s"/>
+    <xsl:value-of select="normalize-space(string($s))"/>
+  </xsl:template>
+
 	<!-- Aquí iniciamos el procesamiento de la cadena original con su | inicial y el terminador || -->
 	<xsl:template match="/">|<xsl:apply-templates select="/cfdi:Comprobante"/>||</xsl:template>
 	<!--  Aquí iniciamos el procesamiento de los datos incluidos en el comprobante -->

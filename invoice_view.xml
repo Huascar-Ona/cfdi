@@ -75,7 +75,7 @@
                     </h1>
                     <field name="fiscal_position" position="after">
                         <field name="formapago_id" on_change="onchange_metododepago(partner_id,formapago_id)"/>
-                        <field name="cuentaBanco" attrs="{'invisible':[('cuentaBanco','=','')]}"/>
+                        <field name="cuenta_banco" attrs="{'invisible':[('cuenta_banco','=','')]}"/>
                     </field>
                 </data>
             </field>

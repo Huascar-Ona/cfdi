@@ -8,6 +8,16 @@
             <field name="inherit_id" ref="base.view_partner_form"/>
             <field name="arch" type="xml">
                 <data>
+                    <field name="street2" position="replace"> 
+                        <field name="street2" invisible="1"/>
+                        <field name="no_exterior" style="width:30%%" placeholder="No. exterior"/>
+                        <field name="no_interior" style="width:30%%" placeholder="No. interior"/>
+                        <field name="colonia" placeholder="Colonia"/>
+                        <field name="municipio" placeholder="Municipio"/>
+                    </field>
+                    <field name="email" position="after">
+                        <field name="vat"/>
+                    </field>
                     <field name="category_id" position="after">
                         <field name="regimen_id" placeholder="Régimen fiscal" groups="cfdi.group_cfdi_manager"/>
                     </field>

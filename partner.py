@@ -1,13 +1,5 @@
 # -*- encoding: utf-8 -*-
 ############################################################################
-#    Module for OpenERP, Open Source Management Solution
-#
-#    Copyright (c) 2013 Zenpar - http://www.zeval.com.mx/
-#    All Rights Reserved.
-############################################################################
-#    Coded by: jsolorzano@zeval.com.mx
-#    Manager: Orlando Zentella ozentella@zeval.com.mx
-############################################################################
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as
@@ -25,6 +17,7 @@
 ##############################################################################
 
 from openerp.osv import osv, fields
+import re
 
 class regimen(osv.Model):
     _name = "cfdi.regimen"
@@ -33,15 +26,27 @@ class regimen(osv.Model):
         'name': fields.char("Regimen Fiscal", size=128),
     }
     
-regimen()
 
 class partner(osv.Model):
-
     _inherit = 'res.partner'
     
     _columns = {
         'regimen_id': fields.many2one('cfdi.regimen', "Regimen Fiscal"),
         'metodo_pago': fields.many2one("cfdi.formapago", string="Metodo de pago"),
+        'no_exterior': fields.char("No. exterior"),
+        'no_interior': fields.char("No. interior"),
+        'colonia': fields.char("Colonia"),
+        'municipio': fields.char("Municipio")
     }
     
-partner()
+    def _check_vat(self, cr, uid, ids, context=None):
+        for partner in self.browse(cr, uid, ids, context=context):
+            if not partner.vat:
+                continue
+            else:
+                return re.match("[A-Z&]{3,4}[0-9]{6}[A-Z&0-9]{3}", partner.vat.upper()) and True or False
+        return True
+
+
+    _constraints = [(_check_vat, "Error en la estructura del RFC. El formato esperado es: 3 o 4 caracteres, 6 digitos, 3 caracteres", ["vat"])]
+
