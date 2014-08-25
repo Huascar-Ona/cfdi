@@ -18,6 +18,7 @@
 
 from openerp.osv import osv, fields
 from openerp import api
+from openerp import fields as newfields
 import xml.etree.ElementTree as ET
 import os
 import inspect
@@ -34,6 +35,7 @@ import re
 from datetime import date, datetime
 from pytz import timezone
 from pacs import get_pac
+import openerp.addons.decimal_precision as dp
 
 class addendas(osv.Model):
     _name = 'cfdi.conf_addenda'
@@ -74,6 +76,45 @@ class account_invoice(osv.Model):
         return new_id
 
     @api.multi
+    def finalize_invoice_move_lines(self, move_lines):
+        res = super(account_invoice,self).finalize_invoice_move_lines(move_lines)
+        if self.discount_type:
+            subtotal = self.amount_untaxed_without_discount
+            if self.discount_type == 'amount':
+                percentage = 1 - ((subtotal - self.discount_amount) / subtotal)
+            else:
+                percentage = self.discount_percent / 100.0
+        else:
+            return res
+        for x1,x2,move_line in move_lines:
+            if move_line["credit"]:
+                move_line["credit"] -= move_line["credit"] * percentage
+            elif move_line["debit"]:
+                move_line["debit"] -= move_line["debit"] * percentage
+            if move_line["tax_amount"]:
+                move_line["tax_amount"] -= move_line["tax_amount"] * percentage
+        return move_lines
+
+    @api.one
+    @api.depends('invoice_line.price_subtotal', 'tax_line.amount')
+    def _compute_amount(self):
+        self.amount_untaxed = sum(line.price_subtotal for line in self.invoice_line)
+        self.amount_untaxed_without_discount = self.amount_untaxed
+        self.amount_discount = 0.0
+        if self.discount_type == 'percent':
+            discount_percent = self.discount_percent / 100.0
+            discount = self.amount_untaxed_without_discount * discount_percent
+        elif self.discount_type == "amount":
+            discount_percent = self.discount_amount * 100.0 / self.amount_untaxed_without_discount
+            discount = self.discount_amount / 100.0
+        self.amount_tax = sum(line.amount for line in self.tax_line)
+        if self.discount_type:
+            self.amount_discount = discount
+            self.amount_untaxed = self.amount_untaxed_without_discount - discount
+            self.amount_tax = self.amount_tax - (self.amount_tax * discount_percent)
+        self.amount_total = self.amount_untaxed + self.amount_tax
+
+    @api.multi
     def onchange_partner_id(self, type, partner_id,\
             date_invoice=False, payment_term=False, partner_bank_id=False, company_id=False):
         res = super(account_invoice, self).onchange_partner_id(type, partner_id,\
@@ -104,8 +145,16 @@ class account_invoice(osv.Model):
             'value': {'cuenta_banco': cuenta}
         })
         return res
+    
+    amount_untaxed_without_discount = newfields.Float(string='Subtotal', digits=dp.get_precision('Account'),
+        store=True, readonly=True, compute='_compute_amount', track_visibility='always')
+    amount_discount = newfields.Float(string='Descuento', digits=dp.get_precision('Account'),
+        store=True, readonly=True, compute='_compute_amount', track_visibility='always')
         
     _columns = {
+        'discount_type': fields.selection([('percent', 'Descuento - Porcentaje'), ('amount', 'Descuento - Cantidad')], string="Descuento"),
+        'discount_amount': fields.float("Cantidad descuento"),
+        'discount_percent': fields.float("Porcentaje descuento"),
         'cuenta_banco': fields.char(u'Últimos 4 dígitos cuenta', size=4),
         'serie': fields.char("Serie", size=8),
         'formapago_id': fields.many2one('cfdi.formapago','Método de Pago'),
@@ -286,9 +335,8 @@ class account_invoice(osv.Model):
             if v:
                 comprobante.set(k,v)
 
-        #TODO: descuento
-        #if invoice.discount_type:
-        #    comprobante.atributos.update({'descuento': round(invoice.discount, dp)})
+        if invoice.discount_type:
+            comprobante.set('descuento', "%s"%round(invoice.amount_discount, dp))
         
         emisor = ET.SubElement(comprobante, ns+'Emisor', {
             'rfc': invoice.company_id.partner_id.vat or "",

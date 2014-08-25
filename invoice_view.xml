@@ -13,7 +13,6 @@
     
         <menuitem action="action_conf_addenda" id="menu_conf_addenda" sequence="" 
             parent="account.menu_finance_configuration" groups="group_cfdi_user" />
-
         
         <record id="conf_addenda_view_form" model="ir.ui.view">
             <field name="name">conf.addenda.form.view</field>
@@ -41,9 +40,6 @@
             </field>
         </record>
 
-
-
-
         <record model="ir.ui.view" id="view_invoice_form_cfd">
             <field name="name">account_invoice_form_cfd</field>
             <field name="model">account.invoice</field>
@@ -53,6 +49,18 @@
                     <button name="invoice_cancel" position="after">
                         <button name="action_cancel_cfdi" type="object" string="Cancelar CFDI" attrs="{'invisible':['|', ('state','!=','open'), ('uuid','=',False)]}"/>
                     </button>
+                    <field name="invoice_line" position="after">
+                        <field name="discount_type" placeholder="Sin Descuento" style="width:30%%" attrs="{'readonly': [('state','!=','draft')]}"/>
+                        <group>
+                            <field name="discount_percent" attrs="{'invisible':[('discount_type','!=','percent')]}"/>
+                            <field name="discount_amount" attrs="{'invisible':[('discount_type','!=','amount')]}"/>
+                        </group>
+                    </field>
+                    <field name="amount_untaxed" position="replace">
+                        <field name="amount_untaxed_without_discount" widget="monetary" options="{'currency_field': 'currency_id'}"  attrs="{'invisible':[('discount_type','=',False)]}"/>
+                        <field name="amount_discount" attrs="{'invisible':[('discount_type','=',False)]}" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                        <field name="amount_untaxed" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                    </field>
                     <notebook position="inside">
                         <page string="Info. SAT">
                             <group>
