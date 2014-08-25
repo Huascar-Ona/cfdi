@@ -2,5 +2,4 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_cfdi_regimen,access_cfdi_regimen,model_cfdi_regimen,group_cfdi_user,1,1,1,1
 access_cfdi_formapago,access_cfdi_formapago,model_cfdi_formapago,group_cfdi_user,1,1,1,1
 access_cfdi_certificate,access_cfdi_certificate,model_cfdi_certificate,group_cfdi_manager,1,1,1,1
-access_cfdi_aprobacion,access_cfdi_aprobacion,model_cfdi_aprobacion,group_cfdi_manager,1,1,1,1
 access_cfdi_conf_addenda,access_cfdi_conf_addenda,model_cfdi_conf_addenda,group_cfdi_user,1,1,1,1
