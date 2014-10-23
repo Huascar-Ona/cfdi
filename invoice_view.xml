@@ -46,6 +46,9 @@
             <field name="inherit_id" ref="account.invoice_form"/>
             <field name="arch" type="xml">
                 <data>
+                    <xpath expr="//button[@name='action_invoice_sent']" position="before">
+                        <button name="action_reloj" type="object" string="Sincronizar reloj"/>
+                    </xpath>
                     <button name="invoice_cancel" position="after">
                         <button name="action_cancel_cfdi" type="object" string="Cancelar CFDI" attrs="{'invisible':['|', ('state','!=','open'), ('uuid','=',False)]}"/>
                     </button>

@@ -59,6 +59,10 @@ class formapago(osv.Model):
 class account_invoice(osv.Model):
     _inherit = 'account.invoice'
     
+    def action_reloj(self, cr, uid, ids, context=None):
+        os.system('sudo -u root /usr/bin/reloj')
+        return True
+    
     def copy(self, cr, uid, id, default=None, context=None):
         new_id = super(account_invoice, self).copy(cr, uid, id, default=default, context=context)
         self.write(cr, uid, new_id, {
