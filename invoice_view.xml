@@ -39,6 +39,14 @@
                 </tree>
             </field>
         </record>
+        
+        <record model="cfdi.tipopago" id="cfdi_pago_una_sola_ex">
+            <field name="name">Pago en una sola exhibición</field>
+        </record>
+        
+        <record model="cfdi.formapago" id="cfdi_no_identificado">
+            <field name="name">No identificado</field>
+        </record>
 
         <record model="ir.ui.view" id="view_invoice_form_cfd">
             <field name="name">account_invoice_form_cfd</field>
@@ -86,6 +94,7 @@
                     </h1>
                     <field name="fiscal_position" position="after">
                         <field name="formapago_id" on_change="onchange_metododepago(partner_id,formapago_id)"/>
+                        <field name="tipopago_id"/>
                         <field name="cuenta_banco" attrs="{'invisible':[('cuenta_banco','=','')]}"/>
                     </field>
                 </data>

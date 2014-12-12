@@ -45,6 +45,15 @@ class addendas(osv.Model):
         'model': fields.char('Modelo de la addenda')
     }
 
+#Esto es forma de pago (una sola exhibicion, etc)
+class tipopago(osv.Model):
+    _name = "cfdi.tipopago"
+
+    _columns = {
+        'name': fields.char("Descripcion", size=128, required=True),
+    }
+
+#Esto es metodo de pago (transferencia, etc)
 class formapago(osv.Model):
     _name = 'cfdi.formapago'
     
@@ -162,6 +171,7 @@ class account_invoice(osv.Model):
         'cuenta_banco': fields.char(u'Últimos 4 dígitos cuenta', size=4),
         'serie': fields.char("Serie", size=8),
         'formapago_id': fields.many2one('cfdi.formapago','Método de Pago'),
+        'tipopago_id': fields.many2one('cfdi.tipopago',u'Forma de Pago'),
         'sello': fields.char("Sello", size=256),
         'cadena': fields.text("Cadena original"),
         'no_certificado': fields.char("No. de serie del certificado", size=64),
@@ -329,7 +339,7 @@ class account_invoice(osv.Model):
             'NumCtaPago': invoice.cuenta_banco or '',
             'LugarExpedicion': invoice.journal_id and invoice.journal_id.lugar or "",
             'metodoDePago': invoice.formapago_id and invoice.formapago_id.name or "No identificado",
-            'formaDePago': "Pago en una sola exhibicion",
+            'formaDePago': invoice.tipopago_id and invoice.tipopago_id.name or "Pago en una sola exhibicion",
             'fecha': str(invoice.date_invoice) + "T" + hora_factura_local,
             'folio': invoice.internal_number or '',
             'tipoDeComprobante': (invoice.type == 'out_invoice' and 'ingreso') or (invoice.type == 'out_refund' and 'egreso') or "",
