@@ -1,0 +1,4 @@
+#!/bin/bash
+# Agregar la siguiente linea al archivo de sudoers
+# odoo ALL=NOPASSWD: /usr/bin/reloj
+ntpdate -u ntp.ubuntu.com
