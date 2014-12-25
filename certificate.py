@@ -18,7 +18,7 @@
 
 from openerp.osv import osv, fields
 from helpers.files import TempFileTransaction
-import helpers.openssl
+import helpers.openssl as openssl
 
 class certificate(osv.Model):
     _name = 'cfdi.certificate'

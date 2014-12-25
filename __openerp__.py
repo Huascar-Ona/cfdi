@@ -18,8 +18,8 @@
 {
     'name' : 'Factura Electronica (CFDI)',
     'version' : '1.0',
-    'author' : 'Zenpar',
-    'website' : 'http://www.zeval.com.mx',
+    'author' : '',
+    'website' : '',
     'category' : 'Invoicing',
     'depends' : ['account', 'sale', 'document'],
     'description': """
