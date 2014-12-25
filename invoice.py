@@ -421,6 +421,17 @@ class account_invoice(osv.Model):
                 'iva_ret': 'IVA',
                 'isr_ret': 'ISR'
             }
+            #Si está instalado el modulo de pedimentos ver si lleva pedimentos el concepto
+            if self.pool.get("ir.module.module").search(cr, uid, [('state','=','installed'),('name','=','pedimentos')]):
+                for pedimento in line.pedimentos:
+                    infoadu = ET.SubElement(concepto, ns+"InformacionAduanera")
+                    for k,v in {
+                        'numero': pedimento.name,
+                        'fecha': pedimento.fecha,
+                        'aduana': pedimento.aduana.name if pedimento.aduana else False
+                    }.iteritems():
+                        if v:
+                            infoadu.set(k,v)
             #Por cada partida ver que impuestos lleva.
             #Estos impuestos tienen que tener una de las 4 categorias (iva, ieps, retencion iva, retencion isr)
             for tax in line.invoice_line_tax_id:
