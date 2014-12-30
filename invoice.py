@@ -89,45 +89,6 @@ class account_invoice(osv.Model):
         return new_id
 
     @api.multi
-    def finalize_invoice_move_lines(self, move_lines):
-        res = super(account_invoice,self).finalize_invoice_move_lines(move_lines)
-        if self.discount_type:
-            subtotal = self.amount_untaxed_without_discount
-            if self.discount_type == 'amount':
-                percentage = 1 - ((subtotal - self.discount_amount) / subtotal)
-            else:
-                percentage = self.discount_percent / 100.0
-        else:
-            return res
-        for x1,x2,move_line in move_lines:
-            if move_line["credit"]:
-                move_line["credit"] -= move_line["credit"] * percentage
-            elif move_line["debit"]:
-                move_line["debit"] -= move_line["debit"] * percentage
-            if move_line["tax_amount"]:
-                move_line["tax_amount"] -= move_line["tax_amount"] * percentage
-        return move_lines
-
-    @api.one
-    @api.depends('invoice_line.price_subtotal', 'tax_line.amount')
-    def _compute_amount(self):
-        self.amount_untaxed = sum(line.price_subtotal for line in self.invoice_line)
-        self.amount_untaxed_without_discount = self.amount_untaxed
-        self.amount_discount = 0.0
-        if self.discount_type == 'percent':
-            discount_percent = self.discount_percent / 100.0
-            discount = self.amount_untaxed_without_discount * discount_percent
-        elif self.discount_type == "amount":
-            discount_percent = self.discount_amount * 100.0 / self.amount_untaxed_without_discount
-            discount = self.discount_amount / 100.0
-        self.amount_tax = sum(line.amount for line in self.tax_line)
-        if self.discount_type:
-            self.amount_discount = discount
-            self.amount_untaxed = self.amount_untaxed_without_discount - discount
-            self.amount_tax = self.amount_tax - (self.amount_tax * discount_percent)
-        self.amount_total = self.amount_untaxed + self.amount_tax
-
-    @api.multi
     def onchange_partner_id(self, type, partner_id,\
             date_invoice=False, payment_term=False, partner_bank_id=False, company_id=False):
         res = super(account_invoice, self).onchange_partner_id(type, partner_id,\
@@ -158,19 +119,22 @@ class account_invoice(osv.Model):
             'value': {'cuenta_banco': cuenta}
         })
         return res
-    
-    amount_untaxed_without_discount = newfields.Float(string='Subtotal', digits=dp.get_precision('Account'),
-        store=True, readonly=True, compute='_compute_amount', track_visibility='always')
-    amount_discount = newfields.Float(string='Descuento', digits=dp.get_precision('Account'),
-        store=True, readonly=True, compute='_compute_amount', track_visibility='always')
+        
+    def _get_discount(self, cr, uid, ids, name, args, context=None):
+        res = {}
+        for rec in self.browse(cr, uid, ids):
+            descuento = 0.0
+            for line in rec.invoice_line:
+                if line.price_subtotal < 0:
+                    descuento += abs(line.price_subtotal)
+            res[rec.id] = descuento
+        return res
         
     _columns = {
-        'discount_type': fields.selection([('percent', 'Descuento - Porcentaje'), ('amount', 'Descuento - Cantidad')], string="Descuento"),
-        'discount_amount': fields.float("Cantidad descuento"),
-        'discount_percent': fields.float("Porcentaje descuento"),
+        'discount': fields.function(_get_discount, type="float", string="Descuento", method=True),
         'cuenta_banco': fields.char(u'Últimos 4 dígitos cuenta', size=4),
         'serie': fields.char("Serie", size=8),
-        'formapago_id': fields.many2one('cfdi.formapago','Método de Pago'),
+        'formapago_id': fields.many2one('cfdi.formapago',u'Método de Pago'),
         'tipopago_id': fields.many2one('cfdi.tipopago',u'Forma de Pago'),
         'sello': fields.char("Sello", size=256),
         'cadena': fields.text("Cadena original"),
@@ -349,8 +313,8 @@ class account_invoice(osv.Model):
             if v:
                 comprobante.set(k,v)
 
-        if invoice.discount_type:
-            comprobante.set('descuento', "%s"%round(invoice.amount_discount, dp))
+        if invoice.discount:
+            comprobante.set('descuento', "%s"%round(invoice.discount, dp))
         
         emisor = ET.SubElement(comprobante, ns+'Emisor', {
             'rfc': invoice.company_id.partner_id.vat or "",
@@ -404,34 +368,35 @@ class account_invoice(osv.Model):
         cfdi_impuestos = {}
         tax_obj = self.pool.get("account.tax")
         for line in invoice.invoice_line:
-            concepto = ET.SubElement(conceptos, ns+'Concepto')
-            for k,v in {
-                'descripcion': line.name or "",
-                'importe': str(round(line.price_subtotal or 0.0, dp)),
-                'valorUnitario': str(round(line.price_unit or 0.0, dp)),
-                'cantidad': str(round(line.quantity or 0.0, dp)),
-                'unidad': line.uos_id and line.uos_id.name or "",
-                'noIdentificacion': line.product_id and line.product_id.default_code or ""
-            }.iteritems():
-                if v:
-                    concepto.set(k,v)
+            if line.price_subtotal > 0:
+                concepto = ET.SubElement(conceptos, ns+'Concepto')
+                for k,v in {
+                    'descripcion': line.name or "",
+                    'importe': str(round(line.price_subtotal or 0.0, dp)),
+                    'valorUnitario': str(round(line.price_unit or 0.0, dp)),
+                    'cantidad': str(round(line.quantity or 0.0, dp)),
+                    'unidad': line.uos_id and line.uos_id.name or "",
+                    'noIdentificacion': line.product_id and line.product_id.default_code or ""
+                }.iteritems():
+                    if v:
+                        concepto.set(k,v)
+                #Si está instalado el modulo de pedimentos ver si lleva pedimentos el concepto
+                if self.pool.get("ir.module.module").search(cr, uid, [('state','=','installed'),('name','=','pedimentos')]):
+                    for pedimento in line.pedimentos:
+                        infoadu = ET.SubElement(concepto, ns+"InformacionAduanera")
+                        for k,v in {
+                            'numero': pedimento.name,
+                            'fecha': pedimento.fecha,
+                            'aduana': pedimento.aduana.name if pedimento.aduana else False
+                        }.iteritems():
+                            if v:
+                                infoadu.set(k,v)
             nombres_impuestos = {
                 'iva': 'IVA',
                 'ieps': 'IEPS',
                 'iva_ret': 'IVA',
                 'isr_ret': 'ISR'
             }
-            #Si está instalado el modulo de pedimentos ver si lleva pedimentos el concepto
-            if self.pool.get("ir.module.module").search(cr, uid, [('state','=','installed'),('name','=','pedimentos')]):
-                for pedimento in line.pedimentos:
-                    infoadu = ET.SubElement(concepto, ns+"InformacionAduanera")
-                    for k,v in {
-                        'numero': pedimento.name,
-                        'fecha': pedimento.fecha,
-                        'aduana': pedimento.aduana.name if pedimento.aduana else False
-                    }.iteritems():
-                        if v:
-                            infoadu.set(k,v)
             #Por cada partida ver que impuestos lleva.
             #Estos impuestos tienen que tener una de las 4 categorias (iva, ieps, retencion iva, retencion isr)
             for tax in line.invoice_line_tax_id:
