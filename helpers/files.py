@@ -32,28 +32,29 @@ import codecs
 class TempFileTransaction:
     def __init__(self):
         self.tempfiles = []
+        self.fds = []
         
     def _get_prefix(self, prefix):
-        return "openerp_cfdi_"+prefix+"_"
+        return "openerp_cfd_mx_"+prefix+"_"
         
     def create(self, prefix=""):
         fd, fname = tempfile.mkstemp(prefix=self._get_prefix(prefix))
         self.add_file(fname)
+        self.fds.append(fd)
         return fname
 
     def decode_and_save(self, b64str, prefix=""):
         fname = self.create(prefix)
-        with open(fname, "wb") as f:
-            f.write(base64.b64decode(b64str))
+        f = open(fname, "wb")
+        f.write(base64.b64decode(b64str))
+        f.close()
         return fname
         
     def save(self, txt, prefix=""): 
         fname = self.create(prefix)
-        with open(fname, "w") as f:
-            f.write(txt)
-        #f = codecs.open(fname, "w", 'utf-8')
-        #f.write(txt)
-        #f.close()
+        f = codecs.open(fname, "w", 'utf-8')
+        f.write(txt)
+        f.close()
         return fname
         
     def load_and_encode(self, fname):
@@ -68,5 +69,11 @@ class TempFileTransaction:
         self.tempfiles.append(fname)
         
     def clean(self):
+        for fd in self.fds:
+            try:
+                os.close(fd)
+                #print "cerrando", fd
+            except:
+                pass
         for fname in self.tempfiles:
             os.unlink(fname)

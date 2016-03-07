@@ -88,6 +88,12 @@ class account_invoice(osv.Model):
         })
         return new_id
 
+    def get_temp_file_trans(self):
+        return TempFileTransaction()
+
+    def get_openssl(self):
+        return openssl
+
     @api.multi
     def onchange_partner_id(self, type, partner_id,\
             date_invoice=False, payment_term=False, partner_bank_id=False, company_id=False):
@@ -235,10 +241,10 @@ class account_invoice(osv.Model):
         #    xml_data = xml_data_b64.decode('base64').decode('utf-8').encode('utf-8')
         #    return tralix.timbrar(xml_data, invoice.company_id.cfdi_tralix_key, hostname)  
       
-    def _get_certificate(self, cr, uid, id, invoice):
+    def _get_certificate(self, cr, uid, id, company_id):
         certificate_obj = self.pool.get("cfdi.certificate")
         certificate_id = certificate_obj.search(cr, uid, ['&', 
-            ('company_id','=', invoice.company_id.id), 
+            ('company_id','=', company_id), 
             ('end_date', '>', date.today().strftime("%Y-%m-%d"))
         ])
         if not certificate_id:
@@ -469,7 +475,7 @@ class account_invoice(osv.Model):
         fname_cadena = tmpfiles.create("cadenaori")
         os.system("xsltproc --output %s %s %s"%(fname_cadena, fname_xslt, fname_xml))
         
-        certificate = self._get_certificate(cr, uid, id, invoice)
+        certificate = self._get_certificate(cr, uid, id, invoice.company_id.id)
         fname_cer_pem = tmpfiles.decode_and_save(certificate.cer_pem)
         fname_key_pem = tmpfiles.decode_and_save(certificate.key_pem)
         
