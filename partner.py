@@ -39,6 +39,13 @@ class partner(osv.Model):
         'municipio': fields.char("Municipio")
     }
     
+    def _check_vat_unique(self, cr, uid, ids, context=None):
+        for partner in self.browse(cr, uid, ids, context=context):
+            res = self.search(cr, uid, [('vat', 'ilike', partner.vat)])
+            if len(res) > 1:
+                return False
+        return True
+
     def _check_vat(self, cr, uid, ids, context=None):
         for partner in self.browse(cr, uid, ids, context=context):
             if not partner.vat:
@@ -48,5 +55,6 @@ class partner(osv.Model):
         return True
 
 
-    _constraints = [(_check_vat, "Error en la estructura del RFC. El formato esperado es: 3 o 4 caracteres, 6 digitos, 3 caracteres", ["vat"])]
-
+    _constraints = [
+            (_check_vat_unique, "Error, el RFC ya existe", ["vat"]),
+            (_check_vat, "Error en la estructura del RFC. El formato esperado es: 3 o 4 caracteres, 6 digitos, 3 caracteres", ["vat"])]
