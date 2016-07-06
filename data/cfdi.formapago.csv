@@ -1,0 +1,11 @@
+id,name,clave,banco
+cfd_mx.metodo1,Efectivo,01,0
+cfd_mx.metodo2,Cheque nominativo,02,0
+cfd_mx.metodo3,Transferencia electrónica de fondos,03,1
+cfd_mx.metodo4,Tarjeta de Crédito,04,0
+cfd_mx.metodo5,Monedero electrónico,05,0
+cfd_mx.metodo6,Dinero electrónico,06,0
+cfd_mx.metodo7,Vales de despensa,08,0
+cfd_mx.metodo8,Tarjeta de Débito,28,0
+cfd_mx.metodo9,Tarjeta de Servicio,29,0
+cfd_mx.metodo10,Otros,99,0

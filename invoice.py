@@ -56,9 +56,17 @@ class tipopago(osv.Model):
 #Esto es metodo de pago (transferencia, etc)
 class formapago(osv.Model):
     _name = 'cfdi.formapago'
+
+    def name_get(self, cr, uid, ids, context=None):
+        res = []
+        for id in ids:
+            elmt = self.browse(cr, uid, id, context=context)
+            res.append((id, "[%s] %s"%(elmt.clave, elmt.name)))
+        return res
     
     _columns = {
         'name': fields.char("Descripcion", size=64, required=True),
+        'clave': fields.char("Clave", help="Clave del catálogo del SAT"),
         'banco': fields.boolean("Banco", help=u"""Marcar esta opción para rellenar el campo 'Últimos 4 dígitos cuenta' 
             automáticamente al elegir este método de pago"""),
         #'pos_metodo': fields.many2one('account.journal',
@@ -308,7 +316,7 @@ class account_invoice(osv.Model):
             'TipoCambio': str(round(rate or 0.0, 4)), #De acuerdo al diario oficial de la federacion son 4 decimales
             'NumCtaPago': invoice.cuenta_banco or '',
             'LugarExpedicion': invoice.journal_id and invoice.journal_id.lugar or "",
-            'metodoDePago': invoice.formapago_id and invoice.formapago_id.name or "No identificado",
+            'metodoDePago': invoice.formapago_id and invoice.formapago_id.clave or "99",
             'formaDePago': invoice.tipopago_id and invoice.tipopago_id.name or "Pago en una sola exhibicion",
             'fecha': str(invoice.date_invoice) + "T" + hora_factura_local,
             'folio': invoice.internal_number or '',
@@ -504,7 +512,7 @@ class account_invoice(osv.Model):
             conf_addenda = conf_addenda_obj.browse(cr, uid, conf_addenda_ids[0])
             addenda_obj = self.pool.get(conf_addenda.model)
             addenda = addenda_obj.create_addenda(Nodo, invoice)
-            if conf_addenda.model == "cfdi.addenda_detallista":
+            if conf_addenda.model == "cfdi.addenda_detallista" or 'complemento' in conf_addenda.model:
                 nom_nodo = "Complemento"
             else:
                 nom_nodo = "Addenda"

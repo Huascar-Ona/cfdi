@@ -28,7 +28,8 @@
     'init_xml': [
         'security/cfdi_groups.xml',
         'security/ir.model.access.csv',
-        'data/estados.xml'
+        'data/estados.xml',
+        'data/cfdi.formapago.csv'
     ],
     'data': [
         'res_company_view.xml',

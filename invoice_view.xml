@@ -107,6 +107,29 @@
                 </field>
             </field>
         </record>
+
+        <record id="action_metodos_pago" model="ir.actions.act_window">
+            <field name="name">Métodos de pago</field>
+            <field name="res_model">cfdi.formapago</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="view_type">tree</field>
+            <field name="view_mode">list,form</field>
+            <field name="target"></field>
+        </record>
+        
+        <record id="metodo_pago_view_tree" model="ir.ui.view">
+            <field name="name">metodo.pago.view.tree</field>
+            <field name="model">cfdi.formapago</field>
+            <field name="arch" type="xml">
+                <tree string="Métodos de pago">
+                    <field name="clave"/>
+                    <field name="name"/>
+                </tree>
+            </field>
+        </record>
+        
+        <menuitem action="action_metodos_pago" id="menu_metodos_pago" sequence=""
+            parent="account.menu_finance_configuration"/>
             
     </data>
 </openerp>
