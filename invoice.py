@@ -93,6 +93,8 @@ class account_invoice(osv.Model):
             'qrcode_data': False,
             'mandada_cancelar': False,
             'mensaje_pac': False,
+            'date_cancel': False,
+            'period_cancel': False
         })
         return new_id
 
@@ -167,6 +169,8 @@ class account_invoice(osv.Model):
         'mandada_cancelar': fields.boolean('Mandada cancelar'),
         'tipo_cambio': fields.float("Tipo de cambio"),
         'mensaje_pac': fields.text('Ultimo mensaje del PAC'),
+        'date_cancel': fields.datetime(u"Fecha cancelación"),
+        'period_cancel': fields.many2one("account.period", u"Periodo de cancelación")
     }
     
     _defaults = {
@@ -185,6 +189,17 @@ class account_invoice(osv.Model):
         res = base64.b64encode(open(tmpfile, 'rb').read())
         os.unlink(tmpfile)
         return data, res
+
+    def action_cancel(self, cr, uid, ids, context=None):
+        this = self.browse(cr, uid, ids)[0]
+        date_cancel = datetime.now()
+        period_cancel = self.pool.get("account.period").search(cr, uid, [
+            ('company_id','=',this.company_id.id),
+            ('date_start','<=',date_cancel),
+            ('date_stop','>=',date_cancel)
+        ])
+        self.write(cr, uid, [this.id], {'date_cancel':date_cancel, 'period_cancel':period_cancel[0]})
+        return super(account_invoice, self).action_cancel(cr, uid, ids, context=context)
 
     def action_cancel_cfdi(self, cr, uid, ids, context=None):
         invoice = self.browse(cr, uid, ids[0])

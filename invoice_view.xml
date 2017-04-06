@@ -105,6 +105,10 @@
                     <field name="serie"/>
                     <field name="internal_number" />
                 </field>
+                <field name="state" position="after">
+                    <field name="date_cancel" />
+                    <field name="period_cancel" />
+                </field>
             </field>
         </record>
 
