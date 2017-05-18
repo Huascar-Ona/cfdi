@@ -52,7 +52,7 @@ class TempFileTransaction:
         
     def save(self, txt, prefix=""): 
         fname = self.create(prefix)
-        f = codecs.open(fname, "w", 'utf-8')
+        f = open(fname, "w")
         f.write(txt)
         f.close()
         return fname
