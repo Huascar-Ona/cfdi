@@ -350,21 +350,6 @@ class account_invoice(osv.Model):
             'nombre': invoice.company_id.partner_id.name or "",
         })
         
-        domicilioFiscal = ET.SubElement(emisor, ns+'DomicilioFiscal')
-        for k,v in {
-            'calle': invoice.company_id.partner_id.street or "",
-            'noExterior': invoice.company_id.partner_id.no_exterior or "",  
-            'noInterior': invoice.company_id.partner_id.no_interior or "",
-            'localidad': invoice.company_id.partner_id.city or "",
-            'colonia': invoice.company_id.partner_id.colonia or "",
-            'municipio': invoice.company_id.partner_id.municipio or "",
-            'estado': invoice.company_id.partner_id.state_id and invoice.company_id.partner_id.state_id.name or "",
-            'pais': invoice.company_id.partner_id.country_id and invoice.company_id.partner_id.country_id.name or "",
-            'codigoPostal': invoice.company_id.partner_id.zip or "",
-        }.iteritems():
-            if v:
-                domicilioFiscal.set(k, v)
-        
         regimenFiscal = ET.SubElement(emisor, ns+'RegimenFiscal', {
             'Regimen': invoice.company_id.partner_id.regimen_id and invoice.company_id.partner_id.regimen_id.name or ""
         })
@@ -373,21 +358,6 @@ class account_invoice(osv.Model):
             'rfc': invoice.partner_id.vat or "",
             'nombre': invoice.partner_id.name or "",
         })
-        
-        domicilio = ET.SubElement(receptor, ns+'Domicilio')
-        for k,v in {
-            'calle': invoice.partner_id.street or "",
-            'noExterior': invoice.partner_id.no_exterior or "",
-            'noInterior': invoice.partner_id.no_interior or "",
-            'localidad': invoice.partner_id.city or "",
-            'colonia': invoice.partner_id.colonia or "",
-            'municipio': invoice.partner_id.municipio or "",
-            'estado': invoice.partner_id.state_id and invoice.partner_id.state_id.name or "",
-            'pais': invoice.partner_id.country_id and invoice.partner_id.country_id.name or "",
-            'codigoPostal': invoice.partner_id.zip or ""
-        }.iteritems():
-            if v:
-                domicilio.set(k,v)
         
         conceptos = ET.SubElement(comprobante, ns+'Conceptos')
         
