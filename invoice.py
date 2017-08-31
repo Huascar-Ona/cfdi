@@ -67,8 +67,7 @@ class formapago(osv.Model):
     _columns = {
         'name': fields.char("Descripcion", size=64, required=True),
         'clave': fields.char("Clave", help="Clave del catálogo del SAT"),
-        'banco': fields.boolean("Banco", help=u"""Marcar esta opción para rellenar el campo 'Últimos 4 dígitos cuenta' 
-            automáticamente al elegir este método de pago"""),
+        'banco': fields.boolean("Bancarizado")
         #'pos_metodo': fields.many2one('account.journal',
         #    domain=[('journal_user','=',1)], string="Metodo de pago del TPV")
     }
@@ -150,8 +149,9 @@ class account_invoice(osv.Model):
         'discount': fields.function(_get_discount, type="float", string="Descuento", method=True),
         'cuenta_banco': fields.char(u'Últimos 4 dígitos cuenta', size=4),
         'serie': fields.char("Serie", size=8),
-        'formapago_id': fields.many2one('cfdi.formapago',u'Método de Pago'),
-        'tipopago_id': fields.many2one('cfdi.tipopago',u'Forma de Pago'),
+        'formapago_id': fields.many2one('cfdi.formapago',u'Forma de pago'),
+        'tipopago_id': fields.many2one('cfdi.tipopago',u'Método de pago'),
+        'tipopago33_id': fields.many2one('cfdi.c_metodopago',u'Método de pago'),
         'sello': fields.char("Sello", size=256),
         'cadena': fields.text("Cadena original"),
         'no_certificado': fields.char("No. de serie del certificado", size=64),
@@ -170,7 +170,8 @@ class account_invoice(osv.Model):
         'tipo_cambio': fields.float("Tipo de cambio"),
         'mensaje_pac': fields.text('Ultimo mensaje del PAC'),
         'date_cancel': fields.datetime(u"Fecha cancelación"),
-        'period_cancel': fields.many2one("account.period", u"Periodo de cancelación")
+        'period_cancel': fields.many2one("account.period", u"Periodo de cancelación"),
+        'usocfdi_id': fields.many2one("cfdi.c_usocfdi", u"Uso CFDI") 
     }
     
     _defaults = {
@@ -226,45 +227,26 @@ class account_invoice(osv.Model):
             raise osv.except_osv("Error", u"PAC '%s' no válido"%invoice.company_id.cfdi_pac)
         self.write(cr, uid, invoice.id, {'mandada_cancelar': True, 'mensaje_pac': res})
         return True
-        #--------------------------------------------------------------------------
-        #if invoice.company_id.cfdi_pac == 'zenpar':
-        #--------------------------------------------------------------------------
-        #    config_obj = self.pool.get('ir.config_parameter')
-        #    password = config_obj.get_param(cr, uid, 'cfdi.password')
-        #    url =   config_obj.get_param(cr, uid, 'cfdi.host')
-        #    client = client = suds.client.Client(url)
-        #    res = client.service.cancelar(rfc, uuid, pfx_data_b64, pfx_password, password)
 
-    def _sign_cfdi(self, cr, uid, invoice, xml_data_b64, test):
-        pac = get_pac(invoice.company_id.cfdi_pac)
-        if pac:
-            return pac.timbrar(invoice, xml_data_b64, test)
+    def _sign_cfdi(self, cr, uid, company_id, xml_data_b64, test):
+        #--------------------------------------------------------------------------
+        if company_id.cfdi_pac == 'finkok':
+        #--------------------------------------------------------------------------
+            if not test and not company_id.cfdi_finkok_host:
+                raise osv.except_osv("Error", "No se ha definido la direccion para el timbrado de Finkok")
+            if test and not company_id.cfdi_finkok_host_test:
+                raise osv.except_osv("Error", "No se ha definido la direccion para el timbrado de Finkok modo pruebas")
+            if not company_id.cfdi_finkok_user or not company_id.cfdi_finkok_key:
+                raise osv.except_osv("Error", "No se ha definido user y password de Finkok")
+            hostname = company_id.cfdi_finkok_host if not test else company_id.cfdi_finkok_host_test
+            username = company_id.cfdi_finkok_user
+            password = company_id.cfdi_finkok_key
+            return get_pac("finkok").timbrar(hostname, username, password, xml_data_b64)
+        #--------------------------------------------------------------------------
         else:
-            raise osv.except_osv("Error", "PAC '%s' no es valido"%invoice.partner_id.cfd_pac)
-        #--------------------------------------------------------------------------
-        #if invoice.company_id.cfdi_pac == 'zenpar':
-        #--------------------------------------------------------------------------
-        #    test = test and 1 or 0
-        #    rfc = invoice.company_id.partner_id.vat
-        #    config_obj = self.pool.get('ir.config_parameter')
-        #    password = config_obj.get_param(cr, uid, 'cfdi.password')
-        #    url =   config_obj.get_param(cr, uid, 'cfdi.host')
-        #    client = suds.client.Client(url)
-        #    return client.service.timbrar(xml_data_b64, test, rfc, password)
-        #--------------------------------------------------------------------------
-        #elif invoice.company_id.cfdi_pac == 'tralix':
-        #--------------------------------------------------------------------------
-        #    if not invoice.company_id.cfdi_tralix_key:
-        #        raise osv.except_osv("Error", "No se ha definido el customer key para el timbrado de Tralix")
-        #    if not test and not invoice.company_id.cfdi_tralix_host:
-        #        raise osv.except_osv("Error", "No se ha definido la direccion para el timbrado de Tralix")
-        #    if test and not invoice.company_id.cfdi_tralix_host_test:
-        #        raise osv.except_osv("Error", "No se ha definido la direccion para el timbrado de Tralix modo pruebas")
-        #    hostname = invoice.company_id.cfdi_tralix_host if not test else invoice.company_id.cfdi_tralix_host_test
-        #    xml_data = xml_data_b64.decode('base64').decode('utf-8').encode('utf-8')
-        #    return tralix.timbrar(xml_data, invoice.company_id.cfdi_tralix_key, hostname)  
+            raise osv.except_osv("Error", "PAC '%s' no es valido"%company_id.cfdi_pac)
       
-    def _get_certificate(self, cr, uid, id, company_id):
+    def _get_certificate(self, cr, uid, company_id):
         certificate_obj = self.pool.get("cfdi.certificate")
         certificate_id = certificate_obj.search(cr, uid, ['&', 
             ('company_id','=', company_id), 
@@ -276,7 +258,31 @@ class account_invoice(osv.Model):
         if not certificate.cer_pem or not certificate.key_pem:
             raise osv.except_osv("Error", "No esta el certificado y la llave en formato PEM")
         return certificate
-        
+
+    def sellar_xml(self, cr, uid, xml, company_id, version="3.3"):
+        tmpfiles = TempFileTransaction()
+        fname_xml = tmpfiles.save(xml, 'xml_sin_sello')
+
+        current_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        if version == '2.2':
+            fname_xslt = current_path+'/SAT/cadenaoriginal_2_2.xslt'
+        elif version == '3.3':
+            fname_xslt = current_path+'/SAT/cadenaoriginal_3_3.xslt'
+        fname_cadena = tmpfiles.create("cadenaori")
+        os.system("xsltproc --output %s %s %s"%(fname_cadena, fname_xslt, fname_xml))
+
+        certificate = self._get_certificate(cr, uid, company_id)
+        fname_cer_pem = tmpfiles.decode_and_save(certificate.cer_pem)
+        fname_key_pem = tmpfiles.decode_and_save(certificate.key_pem)
+
+        sello = openssl.sign_and_encode(fname_cadena, fname_key_pem)
+        certificado = ''.join(open(fname_cer_pem).readlines()[1:-1])
+        certificado = certificado.replace('\n', '')
+
+        cadena = open(fname_cadena, 'rb').read()
+        tmpfiles.clean()
+        return sello, certificado, certificate.serial, cadena        
+
     def action_create_cfd(self, cr, uid, id, context=None):
         invoice = self.browse(cr, uid, id)[0]
         #Si no es el journal adecuado no hacer nada
@@ -293,16 +299,21 @@ class account_invoice(osv.Model):
         if not invoice.formapago_id and not invoice.type.startswith("in"):
             raise osv.except_osv("Error!", "No se definio metodo de pago")
 
+        def con_n_decimales(cantidad, n):
+            cantidad = round(cantidad,n)
+            fmt_string = "%." + str(n) + "f"
+            return fmt_string%cantidad
+
         version = invoice.company_id.cfdi_version
         test = invoice.company_id.cfdi_test
         dp = self.pool.get('decimal.precision').precision_get(cr, uid, 'Account')
-        ns = version == '3.2' and 'cfdi:' or ''
-        if version == '3.2':
+        ns = version == '3.3' and 'cfdi:' or ''
+        if version == '3.3':
             comprobante = ET.Element(ns+'Comprobante', {
-                'version': '3.2',
+                'Version': '3.3',
                 'xmlns:cfdi': "http://www.sat.gob.mx/cfd/3",
                 'xmlns:xsi': "http://www.w3.org/2001/XMLSchema-instance",
-                'xsi:schemaLocation': "http://www.sat.gob.mx/cfd/3  http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv32.xsd" 
+                'xsi:schemaLocation': "http://www.sat.gob.mx/cfd/3  http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv33.xsd" 
             })
         else:
             raise osv.except_osv(u"Error!", u"Versión de CFD no valida")
@@ -325,38 +336,45 @@ class account_invoice(osv.Model):
             mxn_rate = model_data.get_object(cr, uid, 'base', 'MXN').rate
             rate = (1.0 / invoice.currency_id.rate) * mxn_rate
 
+        #TODO Sacar esto de la moneda
+        dp = 2
+
         for k,v in {
-            'serie': invoice.journal_id.serie or '',
+            'Serie': invoice.journal_id.serie or '',
             'Moneda': invoice.currency_id.name or '',
-            'TipoCambio': str(round(rate or 0.0, 4)), #De acuerdo al diario oficial de la federacion son 4 decimales
             'NumCtaPago': invoice.cuenta_banco or '',
             'LugarExpedicion': invoice.journal_id and invoice.journal_id.lugar or "",
-            'metodoDePago': invoice.formapago_id and invoice.formapago_id.clave or "99",
-            'formaDePago': invoice.tipopago_id and invoice.tipopago_id.name or "Pago en una sola exhibicion",
-            'fecha': str(invoice.date_invoice) + "T" + hora_factura_local,
-            'folio': invoice.internal_number or '',
-            'tipoDeComprobante': (invoice.type == 'out_invoice' and 'ingreso') or (invoice.type == 'out_refund' and 'egreso') or "",
-            'subTotal': str(round((invoice.amount_untaxed or 0.0), dp)),
-            'total': str(round((invoice.amount_total or 0.0), dp)),
+            'MetodoPago': invoice.tipopago33_id and invoice.tipopago33_id.code or "",
+            'FormaPago': invoice.formapago_id and invoice.formapago_id.clave or "",
+            'CondicionesDePago': invoice.payment_term.name or '',
+            'Fecha': str(invoice.date_invoice) + "T" + hora_factura_local,
+            'Folio': invoice.internal_number or '',
+            'TipoDeComprobante': (invoice.type == 'out_invoice' and 'I') or (invoice.type == 'out_refund' and 'E') or "",
+            'SubTotal': str(round((invoice.amount_untaxed or 0.0), dp)),
+            'Total': str(round((invoice.amount_total or 0.0), dp)),
         }.iteritems():
             if v:
                 comprobante.set(k,v)
 
         if invoice.discount:
-            comprobante.set('descuento', "%s"%round(invoice.discount, dp))
+            comprobante.set('Descuento', "%s"%round(invoice.discount, dp))
+            
+        if invoice.currency_id.name != "MXN" and invoice.currency_id.name != "XXX":
+            comprobante.set("TipoCambio", "%s"%round(rate, dp)) #TODO checar los porcentajes de variacion
         
+        #TODO: nodo de cfdi relacionados
+
         emisor = ET.SubElement(comprobante, ns+'Emisor', {
-            'rfc': invoice.company_id.partner_id.vat or "",
-            'nombre': invoice.company_id.partner_id.name or "",
-        })
-        
-        regimenFiscal = ET.SubElement(emisor, ns+'RegimenFiscal', {
-            'Regimen': invoice.company_id.partner_id.regimen_id and invoice.company_id.partner_id.regimen_id.name or ""
+            'Rfc': invoice.company_id.partner_id.vat or "",
+            'Nombre': invoice.company_id.partner_id.name or "",
+            'RegimenFiscal': invoice.company_id.partner_id.regimen_id.code or ''
         })
         
         receptor = ET.SubElement(comprobante, ns +'Receptor', {
-            'rfc': invoice.partner_id.vat or "",
-            'nombre': invoice.partner_id.name or "",
+            'Rfc': invoice.partner_id.vat or "",
+            'Nombre': invoice.partner_id.name or "",
+            #TODO residencia fiscal cuando el receptor es extranjero
+            'UsoCFDI': (invoice.usocfdi_id and invoice.usocfdi_id.code) or (invoice.partner_id.usocfdi_id and invoice.partner_id.usocfdi_id.code) or ''
         })
         
         conceptos = ET.SubElement(comprobante, ns+'Conceptos')
@@ -369,13 +387,23 @@ class account_invoice(osv.Model):
         for line in invoice.invoice_line:
             if line.price_subtotal > 0:
                 concepto = ET.SubElement(conceptos, ns+'Concepto')
+                #Si está configurado que el precio incluya los impuestos hay que sacar el precio unitario real
+                for tax in line.invoice_line_tax_id:
+                    if tax.price_include:
+                        print "incluye ipuesto!!!"
+                        precio_unitario = line.price_unit / (1 + tax.amount)
+                        break
+                else:
+                    precio_unitario = line.price_unit
                 for k,v in {
-                    'descripcion': line.name or "",
-                    'importe': str(round(line.price_subtotal or 0.0, dp)),
-                    'valorUnitario': str(round(line.price_unit or 0.0, dp)),
-                    'cantidad': str(round(line.quantity or 0.0, dp)),
-                    'unidad': line.uos_id and line.uos_id.name or "",
-                    'noIdentificacion': line.product_id and line.product_id.default_code or ""
+                    'ClaveProdServ': (line.product_id.code_sat and line.product_id.code_sat.code) or (line.product_id.categ_id.code_sat and line.product_id.categ_id.code_sat.code) or '',
+                    'NoIdentificacion': line.product_id and line.product_id.default_code or "",  
+                    'ClaveUnidad': line.uos_id.code_sat and line.uos_id.code_sat.code or '',
+                    'Descripcion': line.name or "",
+                    'Importe': con_n_decimales(line.price_subtotal, dp),
+                    'ValorUnitario': con_n_decimales(precio_unitario, dp),
+                    'Cantidad': str(round(line.quantity or 0.0, dp)),
+                    'Unidad': line.uos_id and line.uos_id.name or "",
                 }.iteritems():
                     if v:
                         concepto.set(k,v)
@@ -390,29 +418,54 @@ class account_invoice(osv.Model):
                         }.iteritems():
                             if v:
                                 infoadu.set(k,v)
-            nombres_impuestos = {
-                'iva': 'IVA',
-                'ieps': 'IEPS',
-                'iva_ret': 'IVA',
-                'isr_ret': 'ISR'
-            }
-            #Por cada partida ver que impuestos lleva.
-            #Estos impuestos tienen que tener una de las 4 categorias (iva, ieps, retencion iva, retencion isr)
-            for tax in line.invoice_line_tax_id:
-                if not tax.categoria:
-                    raise osv.except_osv(u"Error", u"El impuesto %s no tiene categoria CFDI"%tax.name)
-                impuesto = nombres_impuestos[tax.categoria]
-                comp = tax_obj.compute_all(cr, uid, [tax], line.price_unit, line.quantity, line.product_id, invoice.partner_id)
-                importe = comp['total_included'] - comp['total']
-                importe = round(importe, dp)
-                if tax.type == 'percent':
-                    tasas[impuesto] = round(abs(tax.amount * 100), dp)
-                #Traslados
-                if tax.categoria in ('iva', 'ieps'):
-                    impuestos_traslados.setdefault(impuesto, []).append(importe)
-                #Retenciones
-                else:
-                    impuestos_retenidos.setdefault(impuesto, []).append(importe)
+
+            #Por cada partida poner impuestos
+            #Estos impuestos tienen que tener un tipo (IVA, IEPS, ISR) y si es retención o no
+            if line.invoice_line_tax_id:
+                concepto_impuestos = ET.SubElement(concepto, ns+"Impuestos")
+                concepto_traslados = None
+                concepto_retenciones = None
+                for tax in line.invoice_line_tax_id:
+                    if not tax.tipo_impuesto or not tax.tipo_factor:
+                        raise osv.except_osv(u"Error", u"El impuesto %s no tiene configurado los dos campos Tipo Impuesto y Tipo Factor"%tax.name)
+                    impuesto = tax.tipo_impuesto.code
+                    comp = tax_obj.compute_all(cr, uid, [tax], line.price_unit, line.quantity, line.product_id, invoice.partner_id)
+                    importe = comp['total_included'] - comp['total']
+                    importe = round(importe, dp)
+                    if tax.type == 'percent':
+                        tasas[impuesto] = round(abs(tax.amount * 100), dp)
+                    #Traslados
+                    if not tax.retencion:
+                        if concepto_traslados is None:
+                            concepto_traslados = ET.SubElement(concepto_impuestos, ns+"Traslados")
+                        key = (impuesto, tax.tipo_factor, tax.amount)
+                        impuestos_traslados.setdefault(key, []).append(importe)
+                        tras = ET.SubElement(concepto_traslados, ns+"Traslado")
+                        for k,v in {
+                            'Base': con_n_decimales(precio_unitario * line.quantity, dp),
+                            'Impuesto': impuesto,
+                            'TipoFactor': tax.tipo_factor.name,
+                            'TasaOCuota': str(tax.amount),
+                            'Importe': con_n_decimales(importe, dp)
+                        }.iteritems():
+                            if v:
+                                tras.set(k, v)
+                    #Retenciones
+                    else:
+                        if concepto_retenciones is None:
+                            concepto_retenciones = ET.SubElement(concepto_impuestos, ns+"Retenciones")
+                        impuestos_retenidos.setdefault(impuesto, []).append(importe)
+                        ret = ET.SubElement(concepto_retenciones, ns+"Retencion")
+                        for k,v in {
+                            'Base': con_n_decimales(precio_unitario * line.quantity, dp),
+                            'Impuesto': impuesto,
+                            'TipoFactor': tax.tipo_factor.name,
+                            'TasaOCuota': str(abs(tax.amount)),
+                            'Importe': con_n_decimales(importe, dp)
+                        }.iteritems():
+                            if v:
+                                tras.set(k, v)
+
             
         impuestos = ET.SubElement(comprobante, ns+'Impuestos')
         if impuestos_retenidos:
@@ -421,30 +474,35 @@ class account_invoice(osv.Model):
         
         totalImpuestosTrasladados = 0
         totalImpuestosRetenidos = 0
-        if len(invoice.tax_line) == 0:
-            ET.SubElement(traslados, ns+'Traslado', {
-                'impuesto':'IVA',
-                'tasa': '0.00',
-                'importe': '0.00'
-            })
+        #TODO qué pasa cuando es 0
+        #if len(invoice.tax_line) == 0:
+        #    ET.SubElement(traslados, ns+'Traslado', {
+        #        'impuesto':'IVA',
+        #        'tasa': '0.00',
+        #        'importe': '0.00'
+        #    })
         for impuesto in impuestos_retenidos:
             importe = abs(sum(impuestos_retenidos[impuesto]))
             ET.SubElement(retenciones, ns+'Retencion', {
-                'impuesto': str(impuesto or 0.0),
-                'importe': str(importe or 0.0)
+                'Impuesto': impuesto,
+                'Importe': con_n_decimales(importe or 0.0, dp)
             })
             totalImpuestosRetenidos += importe
-        for impuesto in impuestos_traslados:
-            importe = sum(impuestos_traslados[impuesto])
+        for key in impuestos_traslados:
+            importe = sum(impuestos_traslados[key])
+            impuesto, tipo_factor, tasa_o_cuota = key
             ET.SubElement(traslados, ns+'Traslado', {
-                'impuesto': str(impuesto or 0.0),
-                'importe': str(importe or 0.0),
-                'tasa': str(tasas.get(impuesto, 0.0))
+                'Impuesto': impuesto,
+                'Importe': con_n_decimales(importe or 0.0, dp),
+                'TipoFactor': tipo_factor.name,
+                'TasaOCuota': str(tasa_o_cuota)
             })
             totalImpuestosTrasladados += importe        
-                
-        impuestos.set('totalImpuestosTrasladados', str(totalImpuestosTrasladados))
-        impuestos.set('totalImpuestosRetenidos', str(totalImpuestosRetenidos))
+        
+        if totalImpuestosTrasladados:
+            impuestos.set('TotalImpuestosTrasladados', con_n_decimales(totalImpuestosTrasladados, dp))
+        if totalImpuestosRetenidos:
+            impuestos.set('TotalImpuestosRetenidos', con_n_decimales(totalImpuestosRetenidos, dp))
         
         #Nombre largo de la moneda. Si es MXN poner 'pesos' a menos que se haya puesto algo en el campo de nombre largo
         #Si no es MXN poner lo que está en el campo de nombre largo o en su defecto el código de la moneda
@@ -458,17 +516,19 @@ class account_invoice(osv.Model):
                 
         # *********************** Sellado del XML ************************
         tmpfiles = TempFileTransaction()
-           
+
+        certificate = self._get_certificate(cr, uid, invoice.company_id.id)
+        comprobante.set("NoCertificado", certificate.serial)
+
         xml = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
         fname_xml = tmpfiles.save(xml, 'xml_sin_sello')
         current_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
-        if version == '3.2':
-            fname_xslt = current_path+'/SAT/cadenaoriginal_3_2.xslt'
+        if version == '3.3':
+            fname_xslt = current_path+'/SAT/cadenaoriginal_3_3.xslt'
         fname_cadena = tmpfiles.create("cadenaori")
         os.system("xsltproc --output %s %s %s"%(fname_cadena, fname_xslt, fname_xml))
         
-        certificate = self._get_certificate(cr, uid, id, invoice.company_id.id)
         fname_cer_pem = tmpfiles.decode_and_save(certificate.cer_pem)
         fname_key_pem = tmpfiles.decode_and_save(certificate.key_pem)
         
@@ -476,16 +536,15 @@ class account_invoice(osv.Model):
         certificado = ''.join(open(fname_cer_pem).readlines()[1:-1])
         certificado = certificado.replace('\n', '')
         for k,v in {
-            'sello': sello,
-            'certificado': certificado,
-            'noCertificado': certificate.serial
+            'Sello': sello,
+            'Certificado': certificado,
         }.iteritems():
             comprobante.set(k,v)
             
         #Validar xml resultante contra xsd
         xml = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
         fname_xml = tmpfiles.save(xml, 'xml_con_sello')
-        res_validar = os.popen("xmllint --schema %s/SAT/cfdv32.xsd %s --noout 2>&1"%(current_path, fname_xml)).read()
+        res_validar = os.popen("xmllint --schema %s/SAT/cfdv33.xsd %s --noout 2>&1"%(current_path, fname_xml)).read()
         if not res_validar.strip().endswith("validates"):
             raise osv.except_osv("Error en la estructura del xml", res_validar)
         
@@ -506,19 +565,20 @@ class account_invoice(osv.Model):
             
         # *************** Guardar XML y timbrarlo en su caso ***************
         cfd = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
-        if version == '3.2':
-            res = self._sign_cfdi(cr, uid, invoice, cfd, test)
+        print cfd
+        if version == '3.3':
+            res = self._sign_cfdi(cr, uid, invoice.company_id, base64.b64encode(cfd), test)
             cfd = res
             uuid = re.search('UUID="(.*?)"', cfd).group(1)
             fecha_timbrado = re.search('FechaTimbrado="(.*?)"', cfd).group(1)
-            sello_sat = re.search('selloSAT="(.*?)"', cfd).group(1)
-            certificado_sat = re.search('noCertificadoSAT="(.*?)"', cfd).group(1)
+            sello_sat = re.search('SelloSAT="(.*?)"', cfd).group(1)
+            certificado_sat = re.search('NoCertificadoSAT="(.*?)"', cfd).group(1)
         if nodo_addenda:
             xml_add = ET.tostring(nodo_addenda, encoding="utf-8")
             end_tag = "</"+ns+"Comprobante>"
             cfd = cfd.replace(end_tag, xml_add + end_tag)    
         cfd_b64 = base64.b64encode(cfd.encode("utf-8"))
-        fname = "cfd_"+invoice.number + ".xml"
+        fname = uuid + ".xml"
         attachment_values = {
             'name': fname,
             'datas': cfd_b64,
@@ -539,7 +599,7 @@ class account_invoice(osv.Model):
             'cant_letra': invoice.cant_letra,
             'tipo_cambio': rate,
         }
-        if version == '3.2':
+        if version == '3.3':
             qrcode_data, qrcode = self._make_qrcode(invoice, uuid)
             values.update({
                 'uuid': uuid,

@@ -16,28 +16,29 @@
 #
 ##############################################################################
 
-from openerp.osv import osv, fields
+from openerp import api,models,fields
 import re
 
-class regimen(osv.Model):
+class regimen(models.Model):
     _name = "cfdi.regimen"
     
-    _columns = {
-        'name': fields.char("Regimen Fiscal", size=128),
-    }
+    name = fields.Char(u"Descripción", size=128, required=True)
+    code = fields.Char(u"Código", required=True)
+    fisica = fields.Boolean(u"Aplica para física")
+    moral = fields.Boolean(u"Aplica para moral")
+    fecha_inicio = fields.Date("Fecha inicio vigencia")
     
 
-class partner(osv.Model):
+class partner(models.Model):
     _inherit = 'res.partner'
     
-    _columns = {
-        'regimen_id': fields.many2one('cfdi.regimen', "Regimen Fiscal"),
-        'metodo_pago': fields.many2one("cfdi.formapago", string="Metodo de pago"),
-        'no_exterior': fields.char("No. exterior"),
-        'no_interior': fields.char("No. interior"),
-        'colonia': fields.char("Colonia"),
-        'municipio': fields.char("Municipio")
-    }
+    regimen_id = fields.Many2one('cfdi.regimen', "Regimen Fiscal")
+    metodo_pago = fields.Many2one("cfdi.formapago", string="Metodo de pago")
+    no_exterior = fields.Char("No. exterior")
+    no_interior = fields.Char("No. interior")
+    colonia = fields.Char("Colonia")
+    municipio = fields.Char("Municipio")
+    usocfdi_id = fields.Many2one("cfdi.c_usocfdi", "Uso CFDI")
     
     def _check_vat_unique(self, cr, uid, ids, context=None):
         for partner in self.browse(cr, uid, ids, context=context):

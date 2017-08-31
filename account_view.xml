@@ -8,7 +8,9 @@
             <field name="inherit_id" ref="account.view_tax_form"/>
             <field name="arch" type="xml">
                 <field name="name" position="after">
-                    <field name="categoria"/>
+                    <field name="tipo_impuesto"/>
+                    <field name="retencion"/>
+                    <field name="tipo_factor"/>
                 </field>
             </field>
         </record>

@@ -23,7 +23,7 @@ class company(osv.Model):
     _inherit = 'res.company'
     
     _columns = {
-        "cfdi_version": fields.selection([('3.2', 'CFDI 3.2')], 'Versión', required=True),
+        "cfdi_version": fields.selection([('3.3', 'CFDI 3.3')], 'Versión', required=True),
         "cfdi_test": fields.boolean('Timbrar en modo de prueba'),
         'cfdi_pac': fields.selection([('tralix','Tralix'), ('finkok', 'Finkok')], string="PAC"),
         "cfdi_tralix_key": fields.char("Tralix Customer Key", size=64),
@@ -39,7 +39,7 @@ class company(osv.Model):
     }
     
     _defaults = {
-        'cfdi_version': '3.2',
+        'cfdi_version': '3.3',
         'cfdi_test': True,
         'cfdi_pac': 'finkok',
     }

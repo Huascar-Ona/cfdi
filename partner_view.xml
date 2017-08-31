@@ -23,6 +23,7 @@
                     </field>
                     <field name="property_account_position" position="after">
                         <field name="metodo_pago"/>
+                        <field name="usocfdi_id"/>
                     </field>
                 </data>
             </field>

@@ -12,15 +12,15 @@
                         <group>
                         <group string="General">
                             <field name="cfdi_version" size="10"/>
-                            <field name="cfdi_test" attrs="{'invisible':[('cfdi_version','!=','3.2')]}"/>
+                            <field name="cfdi_test" attrs="{'invisible':[('cfdi_version','!=','3.3')]}"/>
                         </group>
-                        <group string="PAC" attrs="{'invisible':[('cfdi_version','!=','3.2')]}">
+                        <group string="PAC" attrs="{'invisible':[('cfdi_version','!=','3.3')]}">
                             <field name="cfdi_pac"/>
-                            <field name="cfdi_tralix_key" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
+                            <field name="cfdi_tralix_key" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}" password="1"/>
                             <field name="cfdi_tralix_host" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
                             <field name="cfdi_tralix_host_test" attrs="{'invisible':[('cfdi_pac','!=','tralix')]}"/>
                             <field name="cfdi_finkok_user" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
-                            <field name="cfdi_finkok_key" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
+                            <field name="cfdi_finkok_key" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}" password="1"/>
                             <field name="cfdi_finkok_host" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
                             <field name="cfdi_finkok_host_cancel" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>
                             <field name="cfdi_finkok_host_test" attrs="{'invisible':[('cfdi_pac','!=','finkok')]}"/>

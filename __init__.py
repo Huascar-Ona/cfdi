@@ -5,3 +5,5 @@ import invoice
 import certificate
 import wizard
 import account
+import product
+import catalogos

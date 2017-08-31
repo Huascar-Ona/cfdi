@@ -27,23 +27,19 @@
 
 from openerp.osv import osv, fields
 
-categorias = [
-    ('iva', 'IVA'),
-    ('ieps', 'IEPS'),
-    ('iva_ret', 'Ret. IVA'),
-    ('isr_ret', 'Ret. ISR')
-]
-
 class account_tax(osv.Model):
     _inherit='account.tax'
     
     _columns = {
-        'categoria': fields.selection(categorias, string="Categoria CFD"),
+        'tipo_impuesto': fields.many2one("cfdi.c_impuesto", u"Tipo de impuesto"),
+        'retencion': fields.boolean(u"Retención"),
+        'tipo_factor': fields.many2one("cfdi.c_tipofactor", "Tipo factor")
     }
     
 class res_currency(osv.Model):
     _inherit = 'res.currency'
 
     _columns = {
-        'nombre_largo': fields.char("Nombre largo", help="Ejemplo: dólares americanos, francos suizos", size=256)
+        'nombre_largo': fields.char("Nombre largo", help="Ejemplo: dólares americanos, francos suizos", size=256),
+        'porcentaje_variacion': fields.float(u"Porcentaje variación")
     }

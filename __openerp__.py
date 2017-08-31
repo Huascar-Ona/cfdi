@@ -39,7 +39,8 @@
         'account_journal_view.xml',
         #'aprobacion_view.xml',
         'wizard/reporte_mensual_wizard_view.xml',
-        'account_view.xml'
+        'account_view.xml',
+        'product_view.xml'
     ],
     'demo': [],
     'test': [],

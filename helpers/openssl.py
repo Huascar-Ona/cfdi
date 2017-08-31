@@ -70,5 +70,5 @@ def cer_and_key_to_pfx(fname_cer_pem, fname_key_pem, password):
     os.system("openssl pkcs12 -export -out %s -inkey %s -in %s -passout pass:%s"%(fname_pfx, fname_key_pem, fname_cer_pem, password))
     return fname_pfx
     
-def sign_and_encode(fname_plaintext, fname_key_pem, func="sha1"):
+def sign_and_encode(fname_plaintext, fname_key_pem, func="sha256"):
      return base64.b64encode(os.popen("openssl dgst -%s -sign %s %s"%(func, fname_key_pem, fname_plaintext)).read())
