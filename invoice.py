@@ -445,11 +445,12 @@ class account_invoice(osv.Model):
                             'Base': con_n_decimales(precio_unitario * line.quantity, dp),
                             'Impuesto': impuesto,
                             'TipoFactor': tax.tipo_factor.name,
-                            'TasaOCuota': str(tax.amount),
-                            'Importe': con_n_decimales(importe, dp)
                         }.iteritems():
                             if v:
                                 tras.set(k, v)
+                        if tras.attrib.get("TipoFactor") != 'Exento':
+                            tras.set('TasaOCuota', str(abs(tax.amount)))
+                            tras.set("Importe", con_n_decimales(importe, dp))
                     #Retenciones
                     else:
                         if concepto_retenciones is None:
@@ -464,23 +465,24 @@ class account_invoice(osv.Model):
                             'Importe': con_n_decimales(importe, dp)
                         }.iteritems():
                             if v:
-                                tras.set(k, v)
+                                ret.set(k, v)
 
             
         impuestos = ET.SubElement(comprobante, ns+'Impuestos')
         if impuestos_retenidos:
             retenciones = ET.SubElement(impuestos, ns+'Retenciones')
-        traslados = ET.SubElement(impuestos, ns+'Traslados')
+        for key in impuestos_traslados:
+            impuesto, tipo_factor, tasa_o_cuota = key
+            if tipo_factor.name != 'Exento':
+                solo_exentos = False
+                break
+        else:
+            solo_exentos = True
+        if impuestos_traslados and not solo_exentos:
+            traslados = ET.SubElement(impuestos, ns+'Traslados')
         
         totalImpuestosTrasladados = 0
         totalImpuestosRetenidos = 0
-        #TODO qué pasa cuando es 0
-        #if len(invoice.tax_line) == 0:
-        #    ET.SubElement(traslados, ns+'Traslado', {
-        #        'impuesto':'IVA',
-        #        'tasa': '0.00',
-        #        'importe': '0.00'
-        #    })
         for impuesto in impuestos_retenidos:
             importe = abs(sum(impuestos_retenidos[impuesto]))
             ET.SubElement(retenciones, ns+'Retencion', {
@@ -488,16 +490,17 @@ class account_invoice(osv.Model):
                 'Importe': con_n_decimales(importe or 0.0, dp)
             })
             totalImpuestosRetenidos += importe
-        for key in impuestos_traslados:
-            importe = sum(impuestos_traslados[key])
-            impuesto, tipo_factor, tasa_o_cuota = key
-            ET.SubElement(traslados, ns+'Traslado', {
-                'Impuesto': impuesto,
-                'Importe': con_n_decimales(importe or 0.0, dp),
-                'TipoFactor': tipo_factor.name,
-                'TasaOCuota': str(tasa_o_cuota)
-            })
-            totalImpuestosTrasladados += importe        
+        if not solo_exentos:
+            for key in impuestos_traslados:
+                importe = sum(impuestos_traslados[key])
+                impuesto, tipo_factor, tasa_o_cuota = key
+                ET.SubElement(traslados, ns+'Traslado', {
+                   'Impuesto': impuesto,
+                    'Importe': con_n_decimales(importe or 0.0, dp),
+                    'TipoFactor': tipo_factor.name,
+                    'TasaOCuota': str(tasa_o_cuota)
+                })
+                totalImpuestosTrasladados += importe
         
         if totalImpuestosTrasladados:
             impuestos.set('TotalImpuestosTrasladados', con_n_decimales(totalImpuestosTrasladados, dp))
