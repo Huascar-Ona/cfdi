@@ -494,8 +494,10 @@ class account_invoice(osv.Model):
             for key in impuestos_traslados:
                 importe = sum(impuestos_traslados[key])
                 impuesto, tipo_factor, tasa_o_cuota = key
+                if tipo_factor.name == 'Exento':
+                    continue
                 ET.SubElement(traslados, ns+'Traslado', {
-                   'Impuesto': impuesto,
+                    'Impuesto': impuesto,
                     'Importe': con_n_decimales(importe or 0.0, dp),
                     'TipoFactor': tipo_factor.name,
                     'TasaOCuota': str(tasa_o_cuota)
