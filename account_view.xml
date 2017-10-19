@@ -11,6 +11,7 @@
                     <field name="tipo_impuesto"/>
                     <field name="retencion"/>
                     <field name="tipo_factor"/>
+                    <field name="categoria"/>
                 </field>
             </field>
         </record>
