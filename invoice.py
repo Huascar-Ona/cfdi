@@ -307,6 +307,10 @@ class account_invoice(osv.Model):
         version = invoice.company_id.cfdi_version
         test = invoice.company_id.cfdi_test
         dp = self.pool.get('decimal.precision').precision_get(cr, uid, 'Account')
+        
+        if version == '3.2':
+            return self.action_create_cfd_32(cr, uid, id, context=context)
+            
         ns = version == '3.3' and 'cfdi:' or ''
         if version == '3.3':
             comprobante = ET.Element(ns+'Comprobante', {
@@ -621,8 +625,319 @@ class account_invoice(osv.Model):
 
         self.pool.get('account.invoice').write(cr, uid, invoice.id, values)
 
-        tmpfiles.clean() 
+        tmpfiles.clean()
 
+    def action_create_cfd_32(self, cr, uid, id, context=None):
+        invoice = self.browse(cr, uid, id)[0]
+        #Si no es el journal adecuado no hacer nada
+        if invoice.company_id.cfdi_journal_ids:
+            if invoice.journal_id.id not in [x.id for x in invoice.company_id.cfdi_journal_ids]:
+                return True
+        #Si es de proveedor no hacer nada
+        if invoice.type.startswith("in"):
+            return True
+        #Si no hay terminos de pago mandar warning
+        if not invoice.payment_term:
+            raise osv.except_osv("Error!", "No se definio termino de pago")            
+        #Si no hay metodo de pago y es factura de cliente mandar warning
+        if not invoice.formapago_id and not invoice.type.startswith("in"):
+            raise osv.except_osv("Error!", "No se definio metodo de pago")
+
+        version = invoice.company_id.cfdi_version
+        test = invoice.company_id.cfdi_test
+        dp = self.pool.get('decimal.precision').precision_get(cr, uid, 'Account')
+        ns = version == '3.2' and 'cfdi:' or ''
+        if version == '3.2':
+            comprobante = ET.Element(ns+'Comprobante', {
+                'version': '3.2',
+                'xmlns:cfdi': "http://www.sat.gob.mx/cfd/3",
+                'xmlns:xsi': "http://www.w3.org/2001/XMLSchema-instance",
+                'xsi:schemaLocation': "http://www.sat.gob.mx/cfd/3  http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv32.xsd" 
+            })
+        else:
+            raise osv.except_osv(u"Error!", u"Versión de CFD no valida")
+        
+        #Hora de la factura en zona horaria del usuario
+        tz = self.pool.get("res.users").browse(cr, uid, uid).tz
+        hora_factura_utc =  datetime.now(timezone("UTC"))
+        hora_factura_local = hora_factura_utc.astimezone(timezone(tz)).strftime("%H:%M:%S")
+        #print "****HORA", hora_factura_utc.strftime("%H:%M:%S"), hora_factura_local, tz
+
+        #Tipo de cambio
+        #--------------
+        #Si es pesos poner 1 directo
+        if invoice.currency_id.name == 'MXN':
+            rate = 1.0
+        #Si no, obtener el tipo de cambio
+        #(esto funciona aunque la moneda base no sea el peso)
+        else:
+            model_data = self.pool.get("ir.model.data")
+            mxn_rate = model_data.get_object(cr, uid, 'base', 'MXN').rate
+            rate = (1.0 / invoice.currency_id.rate) * mxn_rate
+
+        for k,v in {
+            'serie': invoice.journal_id.serie or '',
+            'Moneda': invoice.currency_id.name or '',
+            'TipoCambio': str(round(rate or 0.0, 4)), #De acuerdo al diario oficial de la federacion son 4 decimales
+            'NumCtaPago': invoice.cuenta_banco or '',
+            'LugarExpedicion': invoice.journal_id and invoice.journal_id.lugar or "",
+            'metodoDePago': invoice.formapago_id and invoice.formapago_id.clave or "99",
+            'formaDePago': invoice.tipopago_id and invoice.tipopago_id.name or "Pago en una sola exhibicion",
+            'fecha': str(invoice.date_invoice) + "T" + hora_factura_local,
+            'folio': invoice.internal_number or '',
+            'tipoDeComprobante': (invoice.type == 'out_invoice' and 'ingreso') or (invoice.type == 'out_refund' and 'egreso') or "",
+            'subTotal': str(round((invoice.amount_untaxed or 0.0), dp)),
+            'total': str(round((invoice.amount_total or 0.0), dp)),
+        }.iteritems():
+            if v:
+                comprobante.set(k,v)
+
+        if invoice.discount:
+            comprobante.set('descuento', "%s"%round(invoice.discount, dp))
+        
+        emisor = ET.SubElement(comprobante, ns+'Emisor', {
+            'rfc': invoice.company_id.partner_id.vat or "",
+            'nombre': invoice.company_id.partner_id.name or "",
+        })
+        
+        domicilioFiscal = ET.SubElement(emisor, ns+'DomicilioFiscal')
+        for k,v in {
+            'calle': invoice.company_id.partner_id.street or "",
+            'noExterior': invoice.company_id.partner_id.no_exterior or "",  
+            'noInterior': invoice.company_id.partner_id.no_interior or "",
+            'localidad': invoice.company_id.partner_id.city or "",
+            'colonia': invoice.company_id.partner_id.colonia or "",
+            'municipio': invoice.company_id.partner_id.municipio or "",
+            'estado': invoice.company_id.partner_id.state_id and invoice.company_id.partner_id.state_id.name or "",
+            'pais': invoice.company_id.partner_id.country_id and invoice.company_id.partner_id.country_id.name or "",
+            'codigoPostal': invoice.company_id.partner_id.zip or "",
+        }.iteritems():
+            if v:
+                domicilioFiscal.set(k, v)
+        
+        regimenFiscal = ET.SubElement(emisor, ns+'RegimenFiscal', {
+            'Regimen': invoice.company_id.partner_id.regimen_id and invoice.company_id.partner_id.regimen_id.name or ""
+        })
+        
+        receptor = ET.SubElement(comprobante, ns +'Receptor', {
+            'rfc': invoice.partner_id.vat or "",
+            'nombre': invoice.partner_id.name or "",
+        })
+        
+        domicilio = ET.SubElement(receptor, ns+'Domicilio')
+        for k,v in {
+            'calle': invoice.partner_id.street or "",
+            'noExterior': invoice.partner_id.no_exterior or "",
+            'noInterior': invoice.partner_id.no_interior or "",
+            'localidad': invoice.partner_id.city or "",
+            'colonia': invoice.partner_id.colonia or "",
+            'municipio': invoice.partner_id.municipio or "",
+            'estado': invoice.partner_id.state_id and invoice.partner_id.state_id.name or "",
+            'pais': invoice.partner_id.country_id and invoice.partner_id.country_id.name or "",
+            'codigoPostal': invoice.partner_id.zip or ""
+        }.iteritems():
+            if v:
+                domicilio.set(k,v)
+        
+        conceptos = ET.SubElement(comprobante, ns+'Conceptos')
+        
+        impuestos_traslados = {}
+        impuestos_retenidos = {}
+        tasas = {}
+        cfdi_impuestos = {}
+        tax_obj = self.pool.get("account.tax")
+        for line in invoice.invoice_line:
+            if line.price_subtotal > 0:
+                concepto = ET.SubElement(conceptos, ns+'Concepto')
+                for k,v in {
+                    'descripcion': line.name or "",
+                    'importe': str(round(line.price_subtotal or 0.0, dp)),
+                    'valorUnitario': str(round(line.price_unit or 0.0, dp)),
+                    'cantidad': str(round(line.quantity or 0.0, dp)),
+                    'unidad': line.uos_id and line.uos_id.name or "",
+                    'noIdentificacion': line.product_id and line.product_id.default_code or ""
+                }.iteritems():
+                    if v:
+                        concepto.set(k,v)
+                #Si está instalado el modulo de pedimentos ver si lleva pedimentos el concepto
+                if self.pool.get("ir.module.module").search(cr, uid, [('state','=','installed'),('name','=','pedimentos')]):
+                    for pedimento in line.pedimentos:
+                        infoadu = ET.SubElement(concepto, ns+"InformacionAduanera")
+                        for k,v in {
+                            'numero': pedimento.name,
+                            'fecha': pedimento.fecha,
+                            'aduana': pedimento.aduana.name if pedimento.aduana else False
+                        }.iteritems():
+                            if v:
+                                infoadu.set(k,v)
+            nombres_impuestos = {
+                'iva': 'IVA',
+                'ieps': 'IEPS',
+                'iva_ret': 'IVA',
+                'isr_ret': 'ISR'
+            }
+            #Por cada partida ver que impuestos lleva.
+            #Estos impuestos tienen que tener una de las 4 categorias (iva, ieps, retencion iva, retencion isr)
+            for tax in line.invoice_line_tax_id:
+                if not tax.categoria:
+                    raise osv.except_osv(u"Error", u"El impuesto %s no tiene categoria CFDI"%tax.name)
+                impuesto = nombres_impuestos[tax.categoria]
+                comp = tax_obj.compute_all(cr, uid, [tax], line.price_unit, line.quantity, line.product_id, invoice.partner_id)
+                importe = comp['total_included'] - comp['total']
+                importe = round(importe, dp)
+                if tax.type == 'percent':
+                    tasas[impuesto] = round(abs(tax.amount * 100), dp)
+                #Traslados
+                if tax.categoria in ('iva', 'ieps'):
+                    impuestos_traslados.setdefault(impuesto, []).append(importe)
+                #Retenciones
+                else:
+                    impuestos_retenidos.setdefault(impuesto, []).append(importe)
+            
+        impuestos = ET.SubElement(comprobante, ns+'Impuestos')
+        if impuestos_retenidos:
+            retenciones = ET.SubElement(impuestos, ns+'Retenciones')
+        traslados = ET.SubElement(impuestos, ns+'Traslados')
+        
+        totalImpuestosTrasladados = 0
+        totalImpuestosRetenidos = 0
+        if len(invoice.tax_line) == 0:
+            ET.SubElement(traslados, ns+'Traslado', {
+                'impuesto':'IVA',
+                'tasa': '0.00',
+                'importe': '0.00'
+            })
+        for impuesto in impuestos_retenidos:
+            importe = abs(sum(impuestos_retenidos[impuesto]))
+            ET.SubElement(retenciones, ns+'Retencion', {
+                'impuesto': str(impuesto or 0.0),
+                'importe': str(importe or 0.0)
+            })
+            totalImpuestosRetenidos += importe
+        for impuesto in impuestos_traslados:
+            importe = sum(impuestos_traslados[impuesto])
+            ET.SubElement(traslados, ns+'Traslado', {
+                'impuesto': str(impuesto or 0.0),
+                'importe': str(importe or 0.0),
+                'tasa': str(tasas.get(impuesto, 0.0))
+            })
+            totalImpuestosTrasladados += importe        
+                
+        impuestos.set('totalImpuestosTrasladados', str(totalImpuestosTrasladados))
+        impuestos.set('totalImpuestosRetenidos', str(totalImpuestosRetenidos))
+        
+        #Nombre largo de la moneda. Si es MXN poner 'pesos' a menos que se haya puesto algo en el campo de nombre largo
+        #Si no es MXN poner lo que está en el campo de nombre largo o en su defecto el código de la moneda
+        if invoice.currency_id.name == 'MXN':
+            nombre = invoice.currency_id.nombre_largo or 'pesos'
+            siglas = 'M.N.'
+        else:
+            nombre = invoice.currency_id.nombre_largo or invoice.currency_id.name
+            siglas = ''
+        invoice.cant_letra = amount_to_text().amount_to_text_cheque(float(invoice.amount_total), nombre, siglas).capitalize()
+                
+        # *********************** Sellado del XML ************************
+        tmpfiles = TempFileTransaction()
+           
+        xml = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
+        fname_xml = tmpfiles.save(xml, 'xml_sin_sello')
+        current_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+
+        if version == '3.2':
+            fname_xslt = current_path+'/SAT/cadenaoriginal_3_2.xslt'
+        fname_cadena = tmpfiles.create("cadenaori")
+        os.system("xsltproc --output %s %s %s"%(fname_cadena, fname_xslt, fname_xml))
+        
+        certificate = self._get_certificate(cr, uid, id, invoice.company_id.id)
+        fname_cer_pem = tmpfiles.decode_and_save(certificate.cer_pem)
+        fname_key_pem = tmpfiles.decode_and_save(certificate.key_pem)
+        
+        sello = openssl.sign_and_encode(fname_cadena, fname_key_pem)
+        certificado = ''.join(open(fname_cer_pem).readlines()[1:-1])
+        certificado = certificado.replace('\n', '')
+        for k,v in {
+            'sello': sello,
+            'certificado': certificado,
+            'noCertificado': certificate.serial
+        }.iteritems():
+            comprobante.set(k,v)
+            
+        #Validar xml resultante contra xsd
+        xml = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
+        fname_xml = tmpfiles.save(xml, 'xml_con_sello')
+        res_validar = os.popen("xmllint --schema %s/SAT/cfdv32.xsd %s --noout 2>&1"%(current_path, fname_xml)).read()
+        if not res_validar.strip().endswith("validates"):
+            raise osv.except_osv("Error en la estructura del xml", res_validar)
+        
+        # ************************ Addenda *********************************
+        nodo_addenda = False
+        conf_addenda_obj = self.pool.get('cfdi.conf_addenda')
+        conf_addenda_ids = conf_addenda_obj.search(cr, uid, [('partner_ids','in',invoice.partner_id.id)])
+        if conf_addenda_ids:
+            conf_addenda = conf_addenda_obj.browse(cr, uid, conf_addenda_ids[0])
+            addenda_obj = self.pool.get(conf_addenda.model)
+            addenda = addenda_obj.create_addenda(Nodo, invoice)
+            if conf_addenda.model == "cfdi.addenda_detallista" or 'complemento' in conf_addenda.model:
+                nom_nodo = "Complemento"
+            else:
+                nom_nodo = "Addenda"
+            nodo_addenda = ET.SubElement(addenda, ns+nom_nodo)
+            addenda_obj.set_namespace(comprobante, nodo_addenda)
+            
+        # *************** Guardar XML y timbrarlo en su caso ***************
+        cfd = '<?xml version="1.0" encoding="utf-8"?>' + ET.tostring(comprobante, encoding="utf-8")
+        if version == '3.2':
+            res = self._sign_cfdi(cr, uid, invoice, cfd, test)
+            cfd = res
+            uuid = re.search('UUID="(.*?)"', cfd).group(1)
+            fecha_timbrado = re.search('FechaTimbrado="(.*?)"', cfd).group(1)
+            sello_sat = re.search('selloSAT="(.*?)"', cfd).group(1)
+            certificado_sat = re.search('noCertificadoSAT="(.*?)"', cfd).group(1)
+        if nodo_addenda:
+            xml_add = ET.tostring(nodo_addenda, encoding="utf-8")
+            end_tag = "</"+ns+"Comprobante>"
+            cfd = cfd.replace(end_tag, xml_add + end_tag)    
+        cfd_b64 = base64.b64encode(cfd.encode("utf-8"))
+        fname = "cfd_"+invoice.number + ".xml"
+        attachment_values = {
+            'name': fname,
+            'datas': cfd_b64,
+            'datas_fname': fname,
+            'description': uuid,
+            'res_model': self._name,
+            'res_id': invoice.id,
+        }
+        self.pool.get('ir.attachment').create(cr, uid, attachment_values, context=context)
+        
+        # *************** Guardar datos CFD en la base del Open ***************
+        sello = re.sub("(.{100})", "\\1\n", sello, 0, re.DOTALL) #saltos de linea cada 100 caracteres
+        values = {
+            'hora_factura': hora_factura_local,       
+            'sello': sello,
+            'cadena': open(fname_cadena, 'rb').read(),
+            'no_certificado': certificate.serial,
+            'cant_letra': invoice.cant_letra,
+            'tipo_cambio': rate,
+        }
+        if version == '3.2':
+            qrcode_data, qrcode = self._make_qrcode(invoice, uuid)
+            values.update({
+                'uuid': uuid,
+                'serie': invoice.journal_id.serie or '',
+                'qrcode_data': qrcode_data,
+                'qrcode': qrcode,
+                'test': test,
+                'sello_sat': sello_sat,
+                'certificado_sat': certificado_sat,
+                'fecha_timbrado': fecha_timbrado,
+                'cadena_sat': re.sub("(.{80})", "\\1\n", '||1.0|%s|%s|%s|%s||'%(uuid.lower(), fecha_timbrado,
+                    sello_sat, certificado_sat), 0, re.DOTALL)
+            })
+
+        self.pool.get('account.invoice').write(cr, uid, invoice.id, values)
+
+        tmpfiles.clean()
+        
 #Para que tambien se mande el xml al elegir un template de email
 class mail_compose_message(osv.TransientModel):
     _inherit = 'mail.compose.message'
