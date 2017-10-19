@@ -848,7 +848,7 @@ class account_invoice(osv.Model):
         fname_cadena = tmpfiles.create("cadenaori")
         os.system("xsltproc --output %s %s %s"%(fname_cadena, fname_xslt, fname_xml))
         
-        certificate = self._get_certificate(cr, uid, id, invoice.company_id.id)
+        certificate = self._get_certificate(cr, uid, invoice.company_id.id)
         fname_cer_pem = tmpfiles.decode_and_save(certificate.cer_pem)
         fname_key_pem = tmpfiles.decode_and_save(certificate.key_pem)
         
